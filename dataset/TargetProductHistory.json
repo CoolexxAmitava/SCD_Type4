@@ -1,0 +1,57 @@
+{
+	"name": "TargetProductHistory",
+	"properties": {
+		"linkedServiceName": {
+			"referenceName": "AzureSqlDatabaseTargetSystem",
+			"type": "LinkedServiceReference"
+		},
+		"annotations": [],
+		"type": "AzureSqlTable",
+		"schema": [
+			{
+				"name": "product_key",
+				"type": "int",
+				"precision": 10
+			},
+			{
+				"name": "product_id",
+				"type": "int",
+				"precision": 10
+			},
+			{
+				"name": "product_name",
+				"type": "varchar"
+			},
+			{
+				"name": "unit_price",
+				"type": "float",
+				"precision": 15
+			},
+			{
+				"name": "product_desc",
+				"type": "varchar"
+			},
+			{
+				"name": "eligible_promotion",
+				"type": "int",
+				"precision": 10
+			},
+			{
+				"name": "start_date",
+				"type": "datetime",
+				"precision": 23,
+				"scale": 3
+			},
+			{
+				"name": "end_date",
+				"type": "datetime",
+				"precision": 23,
+				"scale": 3
+			}
+		],
+		"typeProperties": {
+			"schema": "dbo",
+			"table": "product_dim_hist"
+		}
+	}
+}
