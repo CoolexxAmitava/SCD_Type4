@@ -47,6 +47,7 @@
 				"typeProperties": {
 					"source": {
 						"type": "AzureSqlSource",
+						"sqlReaderQuery": "select * from dbo.product_table where Sync_Flag=0",
 						"queryTimeout": "02:00:00",
 						"partitionOption": "None"
 					},
@@ -153,7 +154,7 @@
 				]
 			},
 			{
-				"name": "Lookup1",
+				"name": "Update Source Table Sync Flag",
 				"type": "Lookup",
 				"dependsOn": [
 					{
@@ -174,7 +175,7 @@
 				"typeProperties": {
 					"source": {
 						"type": "AzureSqlSource",
-						"sqlReaderQuery": "update dbo.product_table set Sync_Flag=1",
+						"sqlReaderQuery": "update dbo.product_table set Sync_Flag=1 where Sync_Flag=0",
 						"queryTimeout": "02:00:00",
 						"partitionOption": "None"
 					},
