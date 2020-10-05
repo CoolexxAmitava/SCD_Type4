@@ -315,6 +315,13 @@
 								"type": "DatasetReference"
 							},
 							"name": "sinkProductDim"
+						},
+						{
+							"dataset": {
+								"referenceName": "TargetProductDim",
+								"type": "DatasetReference"
+							},
+							"name": "deleteFromTarget"
 						}
 					],
 					"transformations": [
@@ -335,9 +342,12 @@
 						},
 						{
 							"name": "FilterOldDataFromTargetTable"
+						},
+						{
+							"name": "AlterRowProductKey"
 						}
 					],
-					"script": "source(output(\n\t\tproduct_id as integer,\n\t\tproduct_name as string,\n\t\tunit_price as double,\n\t\tproduct_desc as string,\n\t\teligible_promotion as integer,\n\t\tcreated_date as timestamp\n\t),\n\tallowSchemaDrift: true,\n\tvalidateSchema: false,\n\tignoreNoFilesFound: false,\n\tisolationLevel: 'READ_UNCOMMITTED',\n\tformat: 'table') ~> stageSource\nsource(output(\n\t\tproduct_key as integer,\n\t\tproduct_id as integer,\n\t\tproduct_name as string,\n\t\tunit_price as double,\n\t\tproduct_desc as string,\n\t\teligible_promotion as integer,\n\t\tstart_date as timestamp\n\t),\n\tallowSchemaDrift: true,\n\tvalidateSchema: false,\n\tignoreNoFilesFound: false,\n\tisolationLevel: 'READ_UNCOMMITTED',\n\tformat: 'table') ~> targetSource\nsource(output(\n\t\tmax_key as integer\n\t),\n\tallowSchemaDrift: true,\n\tvalidateSchema: false,\n\tignoreNoFilesFound: false,\n\tisolationLevel: 'READ_UNCOMMITTED',\n\tquery: 'select case when max(product_key) is null then 0 else max(product_key) end as max_key from dbo.product_dim',\n\tformat: 'query') ~> surrogateKeyMaxValue\nstageSource, surrogateKeyMaxValue join(true(),\n\tjoinType:'cross',\n\tbroadcast: 'auto')~> JoinForSurrogateKey\nJoinForSurrogateKey keyGenerate(output(surrogateKeyTemp as long),\n\tstartAt: 1L) ~> SurrogateKey\nSurrogateKey derive(product_key = surrogateKeyTemp + max_key,\n\t\tstart_date = currentTimestamp()) ~> DerivedColumnProductKey\ntargetSource, stageSource exists(targetSource@product_id == stageSource@product_id,\n\tnegate:false,\n\tbroadcast: 'auto')~> ExistsInTargetTable\nFilterOldDataFromTargetTable derive(end_date = currentTimestamp()) ~> DerivedColumnEndDate\nExistsInTargetTable, DerivedColumnProductKey exists(targetSource@product_key == DerivedColumnProductKey@product_key,\n\tnegate:true,\n\tbroadcast: 'auto')~> FilterOldDataFromTargetTable\nDerivedColumnEndDate sink(input(\n\t\tproduct_key as integer,\n\t\tproduct_id as integer,\n\t\tproduct_name as string,\n\t\tunit_price as double,\n\t\tproduct_desc as string,\n\t\teligible_promotion as integer,\n\t\tstart_date as timestamp,\n\t\tend_date as timestamp\n\t),\n\tallowSchemaDrift: true,\n\tvalidateSchema: false,\n\tdeletable:false,\n\tinsertable:true,\n\tupdateable:false,\n\tupsertable:false,\n\tformat: 'table',\n\tmapColumn(\n\t\tproduct_key,\n\t\tproduct_id,\n\t\tproduct_name,\n\t\tunit_price,\n\t\tproduct_desc,\n\t\teligible_promotion,\n\t\tstart_date,\n\t\tend_date\n\t),\n\tskipDuplicateMapInputs: true,\n\tskipDuplicateMapOutputs: true) ~> sinkHistoryTable\nDerivedColumnProductKey sink(input(\n\t\tproduct_key as integer,\n\t\tproduct_id as integer,\n\t\tproduct_name as string,\n\t\tunit_price as double,\n\t\tproduct_desc as string,\n\t\teligible_promotion as integer,\n\t\tstart_date as timestamp\n\t),\n\tallowSchemaDrift: true,\n\tvalidateSchema: false,\n\tdeletable:false,\n\tinsertable:true,\n\tupdateable:false,\n\tupsertable:false,\n\tformat: 'table',\n\tmapColumn(\n\t\tproduct_key,\n\t\tproduct_id,\n\t\tproduct_name,\n\t\tunit_price,\n\t\tproduct_desc,\n\t\teligible_promotion,\n\t\tstart_date\n\t),\n\tskipDuplicateMapInputs: true,\n\tskipDuplicateMapOutputs: true) ~> sinkProductDim"
+					"script": "source(output(\n\t\tproduct_id as integer,\n\t\tproduct_name as string,\n\t\tunit_price as double,\n\t\tproduct_desc as string,\n\t\teligible_promotion as integer,\n\t\tcreated_date as timestamp\n\t),\n\tallowSchemaDrift: true,\n\tvalidateSchema: false,\n\tignoreNoFilesFound: false,\n\tisolationLevel: 'READ_UNCOMMITTED',\n\tformat: 'table') ~> stageSource\nsource(output(\n\t\tproduct_key as integer,\n\t\tproduct_id as integer,\n\t\tproduct_name as string,\n\t\tunit_price as double,\n\t\tproduct_desc as string,\n\t\teligible_promotion as integer,\n\t\tstart_date as timestamp\n\t),\n\tallowSchemaDrift: true,\n\tvalidateSchema: false,\n\tignoreNoFilesFound: false,\n\tisolationLevel: 'READ_UNCOMMITTED',\n\tformat: 'table') ~> targetSource\nsource(output(\n\t\tmax_key as integer\n\t),\n\tallowSchemaDrift: true,\n\tvalidateSchema: false,\n\tignoreNoFilesFound: false,\n\tisolationLevel: 'READ_UNCOMMITTED',\n\tquery: 'select case when max(product_key) is null then 0 else max(product_key) end as max_key from dbo.product_dim',\n\tformat: 'query') ~> surrogateKeyMaxValue\nstageSource, surrogateKeyMaxValue join(true(),\n\tjoinType:'cross',\n\tbroadcast: 'auto')~> JoinForSurrogateKey\nJoinForSurrogateKey keyGenerate(output(surrogateKeyTemp as long),\n\tstartAt: 1L) ~> SurrogateKey\nSurrogateKey derive(product_key = surrogateKeyTemp + max_key,\n\t\tstart_date = currentTimestamp()) ~> DerivedColumnProductKey\ntargetSource, stageSource exists(targetSource@product_id == stageSource@product_id,\n\tnegate:false,\n\tbroadcast: 'auto')~> ExistsInTargetTable\nFilterOldDataFromTargetTable derive(end_date = currentTimestamp()) ~> DerivedColumnEndDate\nExistsInTargetTable, DerivedColumnProductKey exists(targetSource@product_key == DerivedColumnProductKey@product_key,\n\tnegate:true,\n\tbroadcast: 'auto')~> FilterOldDataFromTargetTable\nDerivedColumnEndDate alterRow(deleteIf(true())) ~> AlterRowProductKey\nDerivedColumnEndDate sink(input(\n\t\tproduct_key as integer,\n\t\tproduct_id as integer,\n\t\tproduct_name as string,\n\t\tunit_price as double,\n\t\tproduct_desc as string,\n\t\teligible_promotion as integer,\n\t\tstart_date as timestamp,\n\t\tend_date as timestamp\n\t),\n\tallowSchemaDrift: true,\n\tvalidateSchema: false,\n\tdeletable:false,\n\tinsertable:true,\n\tupdateable:false,\n\tupsertable:false,\n\tformat: 'table',\n\tmapColumn(\n\t\tproduct_key,\n\t\tproduct_id,\n\t\tproduct_name,\n\t\tunit_price,\n\t\tproduct_desc,\n\t\teligible_promotion,\n\t\tstart_date,\n\t\tend_date\n\t),\n\tskipDuplicateMapInputs: true,\n\tskipDuplicateMapOutputs: true) ~> sinkHistoryTable\nDerivedColumnProductKey sink(input(\n\t\tproduct_key as integer,\n\t\tproduct_id as integer,\n\t\tproduct_name as string,\n\t\tunit_price as double,\n\t\tproduct_desc as string,\n\t\teligible_promotion as integer,\n\t\tstart_date as timestamp\n\t),\n\tallowSchemaDrift: true,\n\tvalidateSchema: false,\n\tdeletable:false,\n\tinsertable:true,\n\tupdateable:false,\n\tupsertable:false,\n\tformat: 'table',\n\tmapColumn(\n\t\tproduct_key,\n\t\tproduct_id,\n\t\tproduct_name,\n\t\tunit_price,\n\t\tproduct_desc,\n\t\teligible_promotion,\n\t\tstart_date\n\t),\n\tskipDuplicateMapInputs: true,\n\tskipDuplicateMapOutputs: true) ~> sinkProductDim\nAlterRowProductKey sink(input(\n\t\tproduct_key as integer,\n\t\tproduct_id as integer,\n\t\tproduct_name as string,\n\t\tunit_price as double,\n\t\tproduct_desc as string,\n\t\teligible_promotion as integer,\n\t\tstart_date as timestamp\n\t),\n\tallowSchemaDrift: true,\n\tvalidateSchema: false,\n\tdeletable:true,\n\tinsertable:false,\n\tupdateable:false,\n\tupsertable:false,\n\tkeys:['product_key'],\n\tformat: 'table',\n\tskipDuplicateMapInputs: true,\n\tskipDuplicateMapOutputs: true) ~> deleteFromTarget"
 				}
 			},
 			"dependsOn": [
@@ -381,7 +391,8 @@
 									"targetSource": {},
 									"surrogateKeyMaxValue": {},
 									"sinkHistoryTable": {},
-									"sinkProductDim": {}
+									"sinkProductDim": {},
+									"deleteFromTarget": {}
 								}
 							},
 							"staging": {},
@@ -536,7 +547,7 @@
 						"typeProperties": {
 							"source": {
 								"type": "AzureSqlSource",
-								"sqlReaderQuery": "update dbo.product_table set Sync_Flag=1 where Sync_Flag=0",
+								"sqlReaderQuery": "update dbo.product_table set Sync_Flag=1 where Sync_Flag=0;\n\nSELECT GETDATE();",
 								"queryTimeout": "02:00:00",
 								"partitionOption": "None"
 							},
