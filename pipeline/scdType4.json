@@ -175,7 +175,7 @@
 				"typeProperties": {
 					"source": {
 						"type": "AzureSqlSource",
-						"sqlReaderQuery": "update dbo.product_table set Sync_Flag=1 where Sync_Flag=0",
+						"sqlReaderQuery": "update dbo.product_table set Sync_Flag=1 where Sync_Flag=0;\n\nSELECT GETDATE();",
 						"queryTimeout": "02:00:00",
 						"partitionOption": "None"
 					},
