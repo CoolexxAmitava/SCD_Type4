@@ -1,0 +1,87 @@
+{
+	"$schema": "http://schema.management.azure.com/schemas/2015-01-01/deploymentTemplate.json#",
+	"contentVersion": "1.0.0.0",
+	"parameters": {
+		"factoryName": {
+			"type": "string",
+			"metadata": "Data Factory name",
+			"defaultValue": "scd004"
+		}
+	},
+	"variables": {
+		"factoryId": "[concat('Microsoft.DataFactory/factories/', parameters('factoryName'))]"
+	},
+	"resources": [
+		{
+			"name": "[concat(parameters('factoryName'), '/dataflow_scd4')]",
+			"type": "Microsoft.DataFactory/factories/dataflows",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"type": "MappingDataFlow",
+				"typeProperties": {
+					"sources": [
+						{
+							"dataset": {
+								"referenceName": "TargetProductStage",
+								"type": "DatasetReference"
+							},
+							"name": "stageSource"
+						},
+						{
+							"dataset": {
+								"referenceName": "TargetProductDim",
+								"type": "DatasetReference"
+							},
+							"name": "targetSource"
+						},
+						{
+							"dataset": {
+								"referenceName": "TargetProductDim",
+								"type": "DatasetReference"
+							},
+							"name": "surrogateKeyMaxValue"
+						}
+					],
+					"sinks": [
+						{
+							"dataset": {
+								"referenceName": "TargetProductHistory",
+								"type": "DatasetReference"
+							},
+							"name": "sinkHistoryTable"
+						},
+						{
+							"dataset": {
+								"referenceName": "TargetProductDim",
+								"type": "DatasetReference"
+							},
+							"name": "sinkProductDim"
+						}
+					],
+					"transformations": [
+						{
+							"name": "JoinForSurrogateKey"
+						},
+						{
+							"name": "SurrogateKey"
+						},
+						{
+							"name": "DerivedColumnProductKey"
+						},
+						{
+							"name": "ExistsInTargetTable"
+						},
+						{
+							"name": "DerivedColumnEndDate"
+						},
+						{
+							"name": "FilterOldDataFromTargetTable"
+						}
+					],
+					"script": "source(output(\n\t\tproduct_id as integer,\n\t\tproduct_name as string,\n\t\tunit_price as double,\n\t\tproduct_desc as string,\n\t\teligible_promotion as integer,\n\t\tcreated_date as timestamp\n\t),\n\tallowSchemaDrift: true,\n\tvalidateSchema: false,\n\tignoreNoFilesFound: false,\n\tisolationLevel: 'READ_UNCOMMITTED',\n\tformat: 'table') ~> stageSource\nsource(output(\n\t\tproduct_key as integer,\n\t\tproduct_id as integer,\n\t\tproduct_name as string,\n\t\tunit_price as double,\n\t\tproduct_desc as string,\n\t\teligible_promotion as integer,\n\t\tstart_date as timestamp\n\t),\n\tallowSchemaDrift: true,\n\tvalidateSchema: false,\n\tignoreNoFilesFound: false,\n\tisolationLevel: 'READ_UNCOMMITTED',\n\tformat: 'table') ~> targetSource\nsource(output(\n\t\tmax_key as integer\n\t),\n\tallowSchemaDrift: true,\n\tvalidateSchema: false,\n\tignoreNoFilesFound: false,\n\tisolationLevel: 'READ_UNCOMMITTED',\n\tquery: 'select case when max(product_key) is null then 0 else max(product_key) end as max_key from dbo.product_dim',\n\tformat: 'query') ~> surrogateKeyMaxValue\nstageSource, surrogateKeyMaxValue join(true(),\n\tjoinType:'cross',\n\tbroadcast: 'auto')~> JoinForSurrogateKey\nJoinForSurrogateKey keyGenerate(output(surrogateKeyTemp as long),\n\tstartAt: 1L) ~> SurrogateKey\nSurrogateKey derive(product_key = surrogateKeyTemp + max_key,\n\t\tstart_date = currentTimestamp()) ~> DerivedColumnProductKey\ntargetSource, stageSource exists(targetSource@product_id == stageSource@product_id,\n\tnegate:false,\n\tbroadcast: 'auto')~> ExistsInTargetTable\nFilterOldDataFromTargetTable derive(end_date = currentTimestamp()) ~> DerivedColumnEndDate\nExistsInTargetTable, DerivedColumnProductKey exists(targetSource@product_key == DerivedColumnProductKey@product_key,\n\tnegate:true,\n\tbroadcast: 'auto')~> FilterOldDataFromTargetTable\nDerivedColumnEndDate sink(input(\n\t\tproduct_key as integer,\n\t\tproduct_id as integer,\n\t\tproduct_name as string,\n\t\tunit_price as double,\n\t\tproduct_desc as string,\n\t\teligible_promotion as integer,\n\t\tstart_date as timestamp,\n\t\tend_date as timestamp\n\t),\n\tallowSchemaDrift: true,\n\tvalidateSchema: false,\n\tdeletable:false,\n\tinsertable:true,\n\tupdateable:false,\n\tupsertable:false,\n\tformat: 'table',\n\tmapColumn(\n\t\tproduct_key,\n\t\tproduct_id,\n\t\tproduct_name,\n\t\tunit_price,\n\t\tproduct_desc,\n\t\teligible_promotion,\n\t\tstart_date,\n\t\tend_date\n\t),\n\tskipDuplicateMapInputs: true,\n\tskipDuplicateMapOutputs: true) ~> sinkHistoryTable\nDerivedColumnProductKey sink(input(\n\t\tproduct_key as integer,\n\t\tproduct_id as integer,\n\t\tproduct_name as string,\n\t\tunit_price as double,\n\t\tproduct_desc as string,\n\t\teligible_promotion as integer,\n\t\tstart_date as timestamp\n\t),\n\tallowSchemaDrift: true,\n\tvalidateSchema: false,\n\tdeletable:false,\n\tinsertable:true,\n\tupdateable:false,\n\tupsertable:false,\n\tformat: 'table',\n\tmapColumn(\n\t\tproduct_key,\n\t\tproduct_id,\n\t\tproduct_name,\n\t\tunit_price,\n\t\tproduct_desc,\n\t\teligible_promotion,\n\t\tstart_date\n\t),\n\tskipDuplicateMapInputs: true,\n\tskipDuplicateMapOutputs: true) ~> sinkProductDim"
+				}
+			},
+			"dependsOn": []
+		}
+	]
+}
